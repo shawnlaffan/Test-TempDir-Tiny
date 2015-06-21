@@ -30,12 +30,11 @@ use Test::TempDir::Tiny;
 
 plan tests => 10;
 
-my $orig_cwd = abs_path('.');
-
 my $lib  = abs_path('lib');
 my $perl = abs_path($^X);
 my $cwd  = abs_path( File::Temp->newdir (TMPDIR => 1) );
 
+chdir $cwd;
 
 # default directory
 my $dir  = tempdir();

@@ -39,10 +39,6 @@ my $perl = abs_path($^X);
 # default directory
 my $dir  = tempdir();
 my $root = Test::TempDir::Tiny::_root_dir();
-my $dirname = _unixify($0);
-$dirname =~ s{/[\.\w]+?$}{};
-$dirname =~ tr{\\/.}{_};
-$dirname =~ s/://g;
 
 my $unix_root = _unixify($root);
 
