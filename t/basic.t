@@ -29,59 +29,79 @@ use Test::TempDir::Tiny;
 
 plan tests => 10;
 
-my $cwd  = abs_path('.');
+my $orig_dir = abs_path('.');
+
 my $lib  = abs_path('lib');
 my $perl = abs_path($^X);
 
-# default directory
-my $dir  = tempdir();
-my $root = Test::TempDir::Tiny::_root_dir();
-my $unix_root = _unixify($root);
+my @targets = (
+    #[abs_path('.'), '/t_basic_t'],
+    #[abs_path('t'), '/t_basic_t'],
+    [abs_path(File::Temp->newdir (TMPDIR => 1)), ''],
+);
 
-ok( -d $root, "root dir exists" );
-like( _unixify($dir), qr{$unix_root/t_basic_t/default_1$}, "default directory created" );
 
-my $dir2 = tempdir();
-like( _unixify($dir2), qr{$unix_root/t_basic_t/default_2$}, "second default directory created" );
+foreach my $target (@targets) {
+    Test::TempDir::Tiny::_cleanup();
+    #chdir $orig_dir;
 
-# non-word chars
-my $bang = tempdir("!!bang!!");
-like( _unixify($bang), qr{$unix_root/t_basic_t/_bang__1$}, "!!bang!! directory created" );
+    my $cwd     = $target->[0];
+    my $sub_dir = $target->[1];
+diag $cwd;
+    chdir $cwd;
 
-# set up pass/fail dirs
-my $passing = _unixify(tempdir("passing"));
-mkdir "$passing/t";
-copy "corpus/01-pass.t", "$passing/t/01-pass.t";
-like( _unixify($passing), qr{$unix_root/t_basic_t/passing_1$}, "passing directory created" );
+    # default directory
+    my $dir  = tempdir();
+    my $root = Test::TempDir::Tiny::_root_dir();
+    my $unix_root = _unixify($root . $sub_dir);
 
-my $failing = _unixify(tempdir("failing"));
-mkdir "$failing/t";
-copy "corpus/01-fail.t", "$failing/t/01-fail.t" or die $!;
-like( _unixify($failing), qr{$unix_root/t_basic_t/failing_1$}, "failing directory created" );
+    ok( -d $root, "root dir exists" );
+    like( _unixify($dir), qr{$unix_root/default_1$}, "default directory created" );
+    
+    my $dir2 = tempdir();
+    like( _unixify($dir2), qr{$unix_root/default_2$}, "second default directory created" );
+    
+    # non-word chars
+    my $bang = tempdir("!!bang!!");
+    like( _unixify($bang), qr{$unix_root/_bang__1$}, "!!bang!! directory created" );
+    
+    # set up pass/fail dirs
+    my $passing = _unixify(tempdir("passing"));
+    mkdir "$passing/t";
+    copy "corpus/01-pass.t", "$passing/t/01-pass.t";
+    like( _unixify($passing), qr{$unix_root/passing_1$}, "passing directory created" );
+    
+    my $failing = _unixify(tempdir("failing"));
+    mkdir "$failing/t";
+    copy "corpus/01-fail.t", "$failing/t/01-fail.t" or die $!;
+    like( _unixify($failing), qr{$unix_root/failing_1$}, "failing directory created" );
+    
+    # passing
+    
+    chdir $passing;
+    my ( $out, $err, $rc ) = capture {
+        system( $perl, "-I$lib", qw/-MTest::Harness -e runtests(@ARGV)/, 't/01-pass.t' )
+    };
+    chdir $cwd;
+    
+    ok( !-d "$passing/tmp/t_01-pass_t", "passing test directory was cleaned up" )
+      or diag "OUT: $out";
+    ok( !-d "$passing/tmp", "passing root directory was cleaned up" );
+    
+    # failing
+    
+    chdir $failing;
+    ( $out, $err, $rc ) = capture {
+        system( $perl, "-I$lib", qw/-MTest::Harness -e runtests(@ARGV)/, 't/01-fail.t' )
+    };
+    chdir $cwd;
+    
+    ok( -d "$failing/tmp/t_01-fail_t", "failing test directory was not cleaned up" )
+      or diag "OUT: $out";
+    ok( -d "$failing/tmp", "failing root directory was not cleaned up" );
 
-# passing
-
-chdir $passing;
-my ( $out, $err, $rc ) = capture {
-    system( $perl, "-I$lib", qw/-MTest::Harness -e runtests(@ARGV)/, 't/01-pass.t' )
-};
-chdir $cwd;
-
-ok( !-d "$passing/tmp/t_01-pass_t", "passing test directory was cleaned up" )
-  or diag "OUT: $out";
-ok( !-d "$passing/tmp", "passing root directory was cleaned up" );
-
-# failing
-
-chdir $failing;
-( $out, $err, $rc ) = capture {
-    system( $perl, "-I$lib", qw/-MTest::Harness -e runtests(@ARGV)/, 't/01-fail.t' )
-};
-chdir $cwd;
-
-ok( -d "$failing/tmp/t_01-fail_t", "failing test directory was not cleaned up" )
-  or diag "OUT: $out";
-ok( -d "$failing/tmp", "failing root directory was not cleaned up" );
+    chdir $orig_dir;
+}
 
 # COPYRIGHT
 
